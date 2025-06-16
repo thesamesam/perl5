@@ -144,6 +144,7 @@ jobs:
       ci_force_cygwin: ${{ steps.ci_config.outputs.ci_force_cygwin }}
       ci_force_minitest: ${{ steps.ci_config.outputs.ci_force_minitest }}
       ci_force_asan: ${{ steps.ci_config.outputs.ci_force_asan }}
+      ci_force_ubsan: ${{ steps.ci_config.outputs.ci_force_ubsan }}
       ci_force_perl_unicode: ${{ steps.ci_config.outputs.ci_force_perl_unicode }}
       ci_force_dist_modules: ${{ steps.ci_config.outputs.ci_force_dist_modules }}
 
@@ -165,6 +166,7 @@ jobs:
           CI_FORCE_CYGWIN: ${{ vars.CI_FORCE_CYGWIN }}
           CI_FORCE_MINITEST: ${{ vars.CI_FORCE_MINITEST }}
           CI_FORCE_ASAN: ${{ vars.CI_FORCE_ASAN }}
+          CI_FORCE_UBSAN: ${{ vars.CI_FORCE_UBSAN }}
           CI_FORCE_PERL_UNICODE: ${{ vars.CI_FORCE_PERL_UNICODE }}
           CI_FORCE_DIST_MODULES: ${{ vars.CI_FORCE_DIST_MODULES }}
         run: |
@@ -179,6 +181,7 @@ jobs:
           [[ -n "${CI_FORCE_CYGWIN}"       ]] && [[ "${CI_FORCE_CYGWIN%[!0 ]*}"       != "${CI_FORCE_CYGWIN}"       ]] && echo "ci_force_cygwin=true" >> "$GITHUB_OUTPUT"
           [[ -n "${CI_FORCE_MINITEST}"     ]] && [[ "${CI_FORCE_MINITEST%[!0 ]*}"     != "${CI_FORCE_MINITEST}"     ]] && echo "ci_force_minitest=true" >> "$GITHUB_OUTPUT"
           [[ -n "${CI_FORCE_ASAN}"         ]] && [[ "${CI_FORCE_ASAN%[!0 ]*}"         != "${CI_FORCE_ASAN}"         ]] && echo "ci_force_asan=true" >> "$GITHUB_OUTPUT"
+          [[ -n "${CI_FORCE_UBSAN}"        ]] && [[ "${CI_FORCE_UBSAN%[!0 ]*}"        != "${CI_FORCE_UBSAN}"        ]] && echo "ci_force_ubsan=true" >> "$GITHUB_OUTPUT"
           [[ -n "${CI_FORCE_PERL_UNICODE}" ]] && [[ "${CI_FORCE_PERL_UNICODE%[!0 ]*}" != "${CI_FORCE_PERL_UNICODE}" ]] && echo "ci_force_perl_unicode=true" >> "$GITHUB_OUTPUT"
           [[ -n "${CI_FORCE_DIST_MODULES}" ]] && [[ "${CI_FORCE_DIST_MODULES%[!0 ]*}" != "${CI_FORCE_DIST_MODULES}" ]] && echo "ci_force_dist_modules=true" >> "$GITHUB_OUTPUT"
           echo '::echo::off'
@@ -737,6 +740,47 @@ jobs:
         # LeakSanitizer is disabled because it randomly crashes, see [gh #19189]
         run: |
           ASAN_OPTIONS=detect_leaks=0 PERL_DESTRUCT_LEVEL=2 TEST_JOBS=2 ./perl t/harness
+
+  # TODO: ASCII
+  UBSAN:
+    name: "UBSAN"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    needs: sanity_check
+    #if: (! cancelled() && (needs.sanity_check.outputs.run_all_jobs == 'true' || needs.sanity_check.outputs.ci_force_ubsan == 'true'))
+
+    strategy:
+      matrix:
+        # -DPURIFY disables arenas and mallocs everything individually. With
+        # ASAN or similar it's the real torture test. However, we also need to
+        # test that the arena code doesn't have any goofs.
+        CONFIGURE_ARGS:
+          - "-Accflags=-DPURIFY"
+          - "-DDEBUGGING"
+          - "-Dusethreads"
+
+    steps:
+      - name: Install System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdbm-dev libdb-dev
+      - uses: actions/checkout@v4
+      - name: git cfg
+        run: |
+          git config diff.renameLimit 999999
+      - name: Configure
+        run: |
+          ./Configure -des -Dusedevel -Dcc="clang -fsanitize=undefined" -Dld="clang -fsanitize=undefined" ${{ matrix.CONFIGURE_ARGS }} -Dprefix="$HOME/perl-blead"
+      - name: Build
+        run: |
+          PERL_DESTRUCT_LEVEL=2 make -j2 test_prep
+      - name: Show Config
+        run: |
+          UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 ./perl -Ilib -V
+          UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 ./perl -Ilib -e 'use Config; print Config::config_sh'
+      - name: Run Tests
+        run: |
+          UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 PERL_DESTRUCT_LEVEL=2 TEST_JOBS=2 ./perl t/harness
 
   #  ____  _____ ____  _        _   _ _   _ ___ ____ ___  ____  _____
   # |  _ \| ____|  _ \| |      | | | | \ | |_ _/ ___/ _ \|  _ \| ____|
