@@ -2920,8 +2920,11 @@ Perl_gp_free(pTHX_ GV *gv)
     if (!gv)
        return;
 
-    if (!isGV_with_GP(gv) || !(gp = GvGP(gv)))
-        return;
+    if (!isGV_with_GP(gv))
+       return;
+
+    if (!(gp = GvGP(gv)))
+       return;
 
     if (gp->gp_refcnt == 0) {
         ck_warner_d(packWARN(WARN_INTERNAL),
