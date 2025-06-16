@@ -59,6 +59,9 @@ on:
 env:
   PERL_SKIP_TTY_TEST: 1
   CONTINUOUS_INTEGRATION: 1
+  CI_SKIP_SANITY: 1
+  CI_FORCE_ASAN: 1
+  CI_FORCE_UBSAN: 1
 
 permissions:
   contents: read # to fetch code
