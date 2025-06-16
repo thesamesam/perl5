@@ -731,7 +731,7 @@ jobs:
           git config diff.renameLimit 999999
       - name: Configure
         run: |
-          ./Configure -des -Dusedevel -Dcc="clang -fsanitize=address" -Dld="clang -fsanitize=address" ${{ matrix.CONFIGURE_ARGS }} -Dprefix="$HOME/perl-blead"
+          ./Configure -des -Dusedevel -Dcc="clang -fsanitize=address -ggdb3" -Dld="clang -fsanitize=address -ggdb3" ${{ matrix.CONFIGURE_ARGS }} -Dprefix="$HOME/perl-blead"
       - name: Build
         run: |
           PERL_DESTRUCT_LEVEL=2 make -j2 test_prep
