@@ -2917,8 +2917,12 @@ Perl_gp_free(pTHX_ GV *gv)
     int attempts = 100;
     bool in_global_destruction = PL_phase == PERL_PHASE_DESTRUCT;
 
-    if (!gv || !isGV_with_GP(gv) || !(gp = GvGP(gv)))
+    if (!gv)
+       return;
+
+    if (!isGV_with_GP(gv) || !(gp = GvGP(gv)))
         return;
+
     if (gp->gp_refcnt == 0) {
         ck_warner_d(packWARN(WARN_INTERNAL),
                     "Attempt to free unreferenced glob pointers"
